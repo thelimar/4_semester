@@ -2,7 +2,7 @@ CC ?= gcc
 OUTPUT ?= a.out
 CFLAGS := ${CFLAGS} -DFAULT_INJECTION
 
-all: clear compile run report
+all: compile run report
 
 .PHONY: run report
 
@@ -10,7 +10,7 @@ compile: HashTest.o HashTable.o OneWayLinkedList.o
 	${CC} HashTest.o HashTable.o OneWayLinkedList.o --coverage -lstdc++ ${CFLAGS}
 HashTest.o: HashTableTest.c HashTable.h OneWayLinkedList.h
 	${CC} -o HashTest.o HashTableTest.c -c --coverage ${CFLAGS}
-HashTable.o: Hashtable.h OneWayLinkedList.h HashTable.c 
+HashTable.o: HashTable.h OneWayLinkedList.h HashTable.c 
 	${CC} -o HashTable.o HashTable.c -c --coverage ${CFLAGS}
 OneWayLinkedList.o: OneWayLinkedList.h OneWayLinkedList.c
 	${CC} -o OneWayLinkedList.o OneWayLinkedList.c -c --coverage ${CFLAGS}
