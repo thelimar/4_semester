@@ -183,7 +183,7 @@ unsigned int MurmurHash2 (ht_data* key, unsigned int len)
 	return h;
 }
 
-int HashForeach (struct HashTable* dis, void (*func) (ht_data* elem))
+int HashForeach (struct HashTable* dis, void (*func) (ht_data* elem, void*), void* context)
 {
 	for (unsigned int i = 0; i < dis->size; i++)
 	{
@@ -195,7 +195,7 @@ int HashForeach (struct HashTable* dis, void (*func) (ht_data* elem))
 
 		for (unsigned int j = 0; j < dis->DataArray[i]->size; j++)
 		{
-			func (current_node->data_one);
+			func (current_node->data_one, context);
 			current_node = current_node->next;
 		}
 	}
@@ -203,8 +203,10 @@ int HashForeach (struct HashTable* dis, void (*func) (ht_data* elem))
 	return 0;
 }
 
-void elem_dump(ht_data* elem)
+void elem_dump (ht_data* elem, void* data)
 {
 	DBG printf ("%s\r\n", elem);
-	return;
+
+	if (!data)
+		return;
 }

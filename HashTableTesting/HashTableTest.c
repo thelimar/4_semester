@@ -192,7 +192,7 @@ int HashTableFindTest ()
 	}
 
 	if (strcmp (HashFind (TinyTable, test_key, strlen (no_find_str)), "data"))    return TEST_FIND;
-	if (HashFind (TinyTable, no_find_str, strlen(no_find_str)) != NULL)    return TEST_FIND;
+	if (HashFind (TinyTable, no_find_str, strlen(no_find_str)) != NULL)           return TEST_FIND;
 
 	HashTableDestruct (TinyTable);
 
@@ -209,7 +209,7 @@ int HashTableForeachTest ()
 
 	if (Table->DataArray == NULL) return 0;
 
-	HashForeach (Table, elem_dump);
+	HashForeach (Table, elem_dump, NULL);
 
 	char* test_key = "key";
 	char* test_data = "data";
@@ -226,7 +226,7 @@ int HashTableForeachTest ()
 		return 0;
 	}
 
-	HashForeach (Table, elem_dump);
+	HashForeach (Table, elem_dump, NULL);
 
 	ListDump (Table->DataArray[MurmurHash2(test_key, strlen(test_key)) % HASH_TABLE_SIZE]);
 	ListDump (0);

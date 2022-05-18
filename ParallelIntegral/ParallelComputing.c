@@ -58,7 +58,7 @@ int main (int argc, char** argv)
     if (data == NULL) HANDLE_ERROR("alloc data:");
 
     ThreadSet (num_of_threads, thr_info, data);
-    IntegralCompute (num_of_threads, thr_info, data);
+    printf ("The result is: %lf", IntegralCompute (num_of_threads, thr_info, data));
 
     free(thr_info);
     free(data);

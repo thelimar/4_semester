@@ -13,5 +13,5 @@ double Integralling (double from, double to)
 
 double func(double x)
 {
-    return pow(x, 3) + pow(log(x), 5) - pow(sin(x), 5.3);
+    return pow(sin(x), 7) + pow(cos(x) * cos(x), 5);
 }

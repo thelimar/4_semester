@@ -23,9 +23,9 @@ struct HashTable
 struct HashTable* HashTableBuild(unsigned int (*HashFunc) (ht_data* str, unsigned int strlen), unsigned int size);
 int HashTableDestruct(struct HashTable* dis);
 ht_data* HashFind(struct HashTable* dis, ht_data* str_to_find, int strlen);
-int HashForeach(struct HashTable* dis, void (*func) (ht_data* elem));
+int HashForeach(struct HashTable* dis, void (*func) (ht_data* elem, void*), void* context);
 int HashTableInsert(struct HashTable* dis, ht_data* key, ht_data* data);
 unsigned int MurmurHash2(ht_data* key, unsigned int len);
 int HashDelete(struct HashTable* dis, int hash);
 int HashDeleteOne(struct HashTable* dis, ht_data* delete_key, ht_data* delete_data, int strlen);
-void elem_dump(ht_data* elem);
+void elem_dump(ht_data* elem, void* data);
