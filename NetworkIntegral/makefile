@@ -7,10 +7,10 @@ CFLAGS := ${CFLAGS}
 all: clean compile_server compile_client
 
 compile_client: NetworkHeader.h Client.c ClientProcessing.c
-	${CC} client.c ClientProcessing.c -o Client -lm -lpthread -std=gnu99
+	${CC} Client.c ClientProcessing.c -o Client -lm -lpthread -std=gnu99
 
 compile_server: NetworkHeader.h Server.c
-	${CC} server.c -o Server -std=gnu99
+	${CC} Server.c -o Server -std=gnu99
 
 
 %.o: %.c %.h
