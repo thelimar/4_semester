@@ -1,151 +1,221 @@
-#define _GNU_SOURCE
-#include <pthread.h>
-#include <sched.h>
-#include <sys/sysinfo.h>
-#include <pthread.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <error.h>
 
+#define _GNU_SOURCE
+#include <math.h>
+#include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <ctype.h>
+#include <errno.h>
+#include <sys/sysinfo.h>
+#include <string.h>
 #include "Integral.h"
 
-#define DATA_SIZE sizeof(double) * 2 + sizeof(int) 
 #define PAGE_SIZE 4096
 
+int num_proc;
+int per_core;
 
-#define HANDLE_ERROR(str)    do{             \
-                                perror(str);\
-                                exit(0);    \
-                            } while (0)       
 
 struct ThreadData
 {
-    double from;
-    double to;
-    int thread_num;
-    double result[(PAGE_SIZE - DATA_SIZE) / sizeof(double)];
+	pthread_t thread_id;
+	double start;
+	double fin;
+	double delta;
+	int num;
+	double sum_local[PAGE_SIZE / sizeof(double)];
 };
 
-
-void ThreadSet(int num_of_threads, pthread_t* thr_info, struct ThreadData* data);
-void* ThreadBody(void* args);
-double IntegralCompute(int num_of_threads, pthread_t* thr_info, struct ThreadData* data);
-void ThreadJoin(int num_of_threads, pthread_t* thr_info);
-int ThreadMounting(int num_of_threads, pthread_t** thr_info, int num_of_real_threads);
+void* IntegralCompute(void* data);
+int max_int(int first, int second);
+int min_int(int first, int second);
+int ThreadMounting();
 
 
-
-int main (int argc, char** argv) 
+int main(int argc, char** argv)
 {
-    if (argc < 2) {
+	num_proc = get_nprocs_conf();
+	per_core = ThreadMounting();
 
-        printf("Not enough parameters\n");
-        return 0;
-    }
+	if (argc < 2) 
+	{
+		fprintf (stderr, "Enter only 1 arg\r\n");
+		exit (EXIT_FAILURE);
+	}
 
-    int num_of_threads = atoi(argv[1]);
+	int threads = atoi(argv[1]);
 
-    if (num_of_threads < 1) {
+	if (threads < 1) 
+	{
+		printf("Number of threads must be more than 0\r\n");
+		return 1;
+	}
 
-        printf("Not enough threads\n");
-        return 0;
-    }
+	int max_thread  = max_int (threads, num_proc);
+	int real_thread = min_int (threads, num_proc);
 
-    pthread_t* thr_info = (pthread_t*) calloc (num_of_threads, sizeof(pthread_t));
-    if (thr_info == NULL) HANDLE_ERROR("alloc threads:");
+	pthread_t* thread_ids = (pthread_t*) calloc(max_thread, sizeof(pthread_t));
 
-    struct ThreadData* data = (struct ThreadData*) calloc (num_of_threads, sizeof(struct ThreadData));
-    if (data == NULL) HANDLE_ERROR("alloc data:");
+	if (thread_ids == NULL) 
+	{
+		printf("Can't alloc that much memory\n");
+		perror("thread_ids");
+		return 2;
+	}
 
-    ThreadSet (num_of_threads, thr_info, data);
-    printf ("The result is: %lf", IntegralCompute (num_of_threads, thr_info, data));
+	struct ThreadData* params = (struct ThreadData*)calloc(max_thread, sizeof(struct ThreadData));
 
-    free(thr_info);
-    free(data);
+	if (params == NULL) 
+	{
+		printf("Memory allocation error\r\n");
+		perror("params");
+		return -1;
+	}
+
+	double global_start = -10;
+	double global_fin = 10;
+	double global_delta = 0.0000004;
+
+	double interval = (global_fin - global_start) / real_thread;
+
+	int err = 0;
+
+	for (int i = 0; i < real_thread; i++) {
+
+		params[i].start = global_start + i * interval;
+		params[i].fin = global_start + (i + 1) * interval;
+		params[i].delta = global_delta;
+		params[i].num = i;
+	}
+
+	for (int i = threads; i < max_thread; i++) 
+	{
+		params[i].start = global_start;
+		params[i].fin = global_start + interval;
+		params[i].delta = global_delta;
+		params[i].num = i;
+	}
+
+	double sum_global = 0;
+	int created = 0;
+
+	for (int i = 0; i < max_thread; i++) 
+	{
+		err = pthread_create(&(params[i].thread_id), NULL, IntegralCompute, &params[i]);
+		if (err == 0) created++;
+	}
+
+
+	for (int i = 0; i < created; i++) 
+	{
+		err = pthread_join(params[i].thread_id, NULL);
+		if (err != 0) {
+			perror ("pthread_join");
+		}
+
+		if (i < real_thread) sum_global += params[i].sum_local[0];
+	}
+
+	printf ("Result is: %lf\r\n", sum_global);
+
+	free(thread_ids);
+	free(params);
 }
 
 
-void* ThreadBody(void* args) 
+int max_int(int first, int second) 
 {
-
-    struct ThreadData* data = (struct ThreadData*)args;
-    cpu_set_t cpuset;
-
-    CPU_ZERO(&cpuset);
-    CPU_SET(data->thread_num, &cpuset);
-
-    pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset);
-
-    *data->result = Integralling (data->from, data->to);
-
-    return NULL;
+	if (first > second) return first;
+	else return second;
 }
 
 
-void ThreadJoin (int num_of_threads, pthread_t* thr_info) 
+int min_int(int first, int second) 
 {
-    for (int i = 0; i < num_of_threads; i++) {
-
-        if (pthread_join(thr_info[i], NULL) != 0) HANDLE_ERROR("thread join:");
-    }
+	if (first < second) return first;
+	else return second;
 }
 
 
-void ThreadSet (int num_of_threads, pthread_t* thr_info, struct ThreadData* data) 
+int read_number(const char* str, int* num) 
 {
-    int procs_num = get_nprocs();
-    pthread_t* im_theads = NULL;
+	if (str == NULL) return -1;
 
-    int im_threads_num = ThreadMounting (procs_num - num_of_threads, &im_theads, num_of_threads);
-
-    for (int i = 0; i < num_of_threads; i++) {
-
-        data[i].from = i * (RANGE / num_of_threads);
-        data[i].to = data[i].from + (RANGE / num_of_threads);
-        data[i].thread_num = (im_threads_num + i) % procs_num;
-
-        if (pthread_create(thr_info + i, NULL, ThreadBody, data + i) != 0) HANDLE_ERROR("thread create:");
-    }
-
-    ThreadJoin(im_threads_num, im_theads);
+	const char* iter = str;
+	while (!isdigit(*iter)) iter++;
+	return sscanf(iter, "%d", num);
 }
 
-int ThreadMounting(int num_of_threads, pthread_t** thr_info, int num_of_real_threads)
+int ThreadMounting()
 {
+	per_core = 2;
 
-    if (num_of_threads <= 0) return 0;
+	FILE* cpu_info_file = popen("lscpu -y", "r");
 
-    double adj_coef = 1;
-    *thr_info = (pthread_t*)calloc(num_of_threads, sizeof(pthread_t));
-    if (thr_info == NULL) HANDLE_ERROR("alloc threads:");
+	if (cpu_info_file != NULL) {
 
-    struct ThreadData* data = (struct ThreadData*)calloc(num_of_threads, sizeof(struct ThreadData));
-    if (data == NULL) HANDLE_ERROR("alloc data:");
+		char* file_buf = NULL;
+		size_t dump_size = 0;
 
-    for (int i = 0; i < num_of_threads; i++) {
+		getdelim(&file_buf, &dump_size, '\0', cpu_info_file);
 
-        data[i].from = 0;
-        data[i].to = (RANGE / num_of_real_threads) * adj_coef;
-        data[i].thread_num = i;
+		if (file_buf == NULL) return per_core;
 
-        if (pthread_create((*thr_info) + i, NULL, ThreadBody, data + i) != 0) HANDLE_ERROR("thread create:");
-    }
+		char* place = strstr(file_buf, "Thread(s) per core:");
+		read_number(place, &per_core);
 
-    return num_of_threads;
+		free(file_buf);
+
+	}
+	else 
+	{
+		FILE* file_ht_active = fopen("/sys/devices/system/cpu/smt/active", "r");
+		if (file_ht_active == NULL) return per_core;
+
+		int active = 0;
+		int err = fscanf(file_ht_active, "%d", &active);
+		if (err < 1) return per_core;
+
+		if (active > 0) per_core = 2; // HT active
+		else per_core = 1;
+
+		fclose(file_ht_active);
+	}
+
+	fclose(cpu_info_file);
+
+	return per_core;
 }
 
 
-double IntegralCompute(int num_of_threads, pthread_t* thr_info, struct ThreadData* data)
+void* IntegralCompute (void* data) 
 {
+	struct ThreadData* param = data;
 
-    double integral = 0;
+	cpu_set_t cpuset;
+	CPU_ZERO(&cpuset);
 
-    for (int i = 0; i < num_of_threads; i++) {
+	int num_real_cpu = num_proc / per_core;
+	int num_of_cpu = ((param->num % num_real_cpu) * per_core + param->num / num_real_cpu) % num_proc;
 
-        if (pthread_join(thr_info[i], NULL) != 0) HANDLE_ERROR("thread join:");
+	CPU_SET(num_of_cpu, &cpuset);
 
-        integral += data[i].result[0];
-    }
+	int err = pthread_setaffinity_np(param->thread_id, sizeof(cpuset), &cpuset);
 
-    return integral;
+	if (err != 0) 
+	{
+		printf("Err is %d in %d\n", err, param->num);
+		perror("CPU_ALLOC");
+	}
+
+	param->sum_local[0] = 0;
+
+	for (; param->start < param->fin; param->start += param->delta) 
+	{
+		double x = param->start + param->delta / 2;
+		param->sum_local[0] += func (x) * param->delta;
+	}
+
+	return NULL;
 }

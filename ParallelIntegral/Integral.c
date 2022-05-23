@@ -1,6 +1,7 @@
 #include "Integral.h"
+#define e 2.71828182846
 
-
+/*
 double Integralling (double from, double to) 
 {
     double res = 0;
@@ -10,8 +11,9 @@ double Integralling (double from, double to)
 
     return res;
 }
+*/
 
 double func(double x)
 {
-    return pow(sin(x), 7) + pow(cos(x) * cos(x), 5);
+    return 1.8 * (pow (e, x) + pow (e, -x));
 }
